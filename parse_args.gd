@@ -100,13 +100,13 @@ func _ready():
 	var args : PackedStringArray = OS.get_cmdline_args()
 	if ("--export" in args) or ("--export-material" in args):
 		print("Exporting...")
-		var image_size : int = 2048
 		var dir : DirAccess = DirAccess.open(".")
 		print("Current dir: ", dir.get_current_dir())
 		var target : String = "Godot/Godot 4 Standard"
 		#TODO: fix this
 		var output_dir : String = dir.get_current_dir()
 		var output_file : String = "%f"
+		# 0 keeps each Material node's own size parameter; --size overrides it.
 		var texture_size : int = 0
 		var files : Array[String] = []
 		var i = 1
@@ -123,9 +123,12 @@ func _ready():
 					output_file = OS.get_cmdline_args()[i]
 				"--size":
 					i += 1
-					texture_size = int(OS.get_cmdline_args()[i])
-					if texture_size < 0:
-						#show_error("ERROR: incorrect size "+OS.get_cmdline_args()[i])
+					var size_arg : String = OS.get_cmdline_args()[i] if i < OS.get_cmdline_args().size() else ""
+					texture_size = size_arg.to_int() if size_arg.is_valid_int() else -1
+					# Same range as the Material node size parameter: 64 to 8192, power of two.
+					if texture_size < 64 or texture_size > 8192 or (texture_size & (texture_size - 1)) != 0:
+						show_error("ERROR: incorrect size '%s' (expected a power of two from 64 to 8192)" % size_arg)
+						get_tree().quit(1)
 						return
 				_:
 					files.push_back(OS.get_cmdline_args()[i])
@@ -165,7 +168,7 @@ func _ready():
 									expanded_files.push_back("website:"+str(mi))
 			else:
 				expanded_files.push_back(f)
-		await export_files(expanded_files, output_dir, target, output_file, image_size)
+		await export_files(expanded_files, output_dir, target, output_file, texture_size)
 	else:
 		var no_logo : bool = ( args.find("--no-splash") != -1 )
 		var scene : PackedScene
